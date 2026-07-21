@@ -7,14 +7,13 @@
     :local hexWanIp        "192.168.1.253/30"
     :local localDomain     "lan"
 
-    # Hex values are now explicitly defined clean IPv6 Gateways - no dynamic pools required
+    # Hex values are explicitly defined clean IPv6 Gateways - no dynamic pools required
     :local networks {
         {id="none"; gw4="192.168.88.1"; net4="192.168.88.0/24"; dhcp4="Y"; sub6="fd00:88::1/64"; ra6="Y"; desc="Management LAN"};
-        {id="20";   gw4="192.168.20.1"; net4="192.168.20.0/24"; dhcp4="Y"; sub6="fd00:20::1/64"; ra6="Y"; desc="IoT Network"};
-        {id="30";   gw4="192.168.30.1"; net4="192.168.30.0/24"; dhcp4="Y"; sub6="fd00:30::1/64"; ra6="Y"; desc="Guest Network"};
-        {id="40";   gw4="none";         net4="none";            dhcp4="N"; sub6="fd00:40::1/64"; ra6="Y"; desc="Security Cameras"};
-        {id="50";   gw4="192.168.50.1"; net4="192.168.50.0/24"; dhcp4="Y"; sub6="fd00:50::1/64"; ra6="Y"; desc="Home Lab"};
-        {id="60";   gw4="192.168.60.1"; net4="192.168.60.0/24"; dhcp4="N"; sub6="none";          ra6="N"; desc="Storage NAS"}
+        {id="10";   gw4="192.168.10.1"; net4="192.168.10.0/24"; dhcp4="Y"; sub6="fd00:10::1/64"; ra6="Y"; desc="Openstack tenant #1"};
+        {id="20";   gw4="192.168.20.1"; net4="192.168.20.0/24"; dhcp4="Y"; sub6="fd00:20::1/64"; ra6="Y"; desc="Openstack tenant #2"};
+        {id="30";   gw4="192.168.30.1"; net4="192.168.30.0/24"; dhcp4="Y"; sub6="fd00:30::1/64"; ra6="N"; desc="Openstack tenant #3"};
+        {id="40";   gw4="none";         net4="none";            dhcp4="N"; sub6="fd00:40::1/64"; ra6="Y"; desc="Openstack tenant #4"};
     }
 
     # =========================================================================
@@ -40,19 +39,21 @@
     /ipv6 nd remove [/ipv6 nd find where comment~"ND-"]
     /ipv6 dhcp-client remove [/ipv6 dhcp-client find interface=ether1]
 
+    /interface bridge vlan remove [/interface bridge vlan find where bridge="bridge-trunk"]
     /interface vlan remove [/interface vlan find where name~"vlan-"]
     /interface bridge port remove [/interface bridge port find where bridge="bridge-trunk"]
     /interface bridge remove [/interface bridge find name="bridge-trunk"]
 
     # =========================================================================
-    # REBUILD MASTER BRIDGE FOR MAXIMUM ACCELERATION
+    # REBUILD MASTER BRIDGE WITH VLAN FILTERING (HYBRID PORTS enabled)
     # =========================================================================
-    /interface bridge add name=bridge-trunk fast-forward=yes comment="Master Trunk Bridge"
+    /interface bridge add name=bridge-trunk vlan-filtering=yes fast-forward=yes comment="Master Trunk Bridge"
+    
     /interface bridge port
-    add bridge=bridge-trunk interface=ether2
-    add bridge=bridge-trunk interface=ether3
-    add bridge=bridge-trunk interface=ether4
-    add bridge=bridge-trunk interface=ether5
+    add bridge=bridge-trunk interface=ether2 pvid=1 frame-types=admit-all
+    add bridge=bridge-trunk interface=ether3 pvid=1 frame-types=admit-all
+    add bridge=bridge-trunk interface=ether4 pvid=1 frame-types=admit-all
+    add bridge=bridge-trunk interface=ether5 pvid=1 frame-types=admit-all
 
     # Core IPv4 Layout
     /ip address add address=$hexWanIp interface=ether1 comment="WAN to Domestic Network"
@@ -60,7 +61,7 @@
     /ip dns set allow-remote-requests=yes servers=1.1.1.1,8.8.8.8
     /interface ethernet set [find name=ether1] arp=enabled
 
-    # Core IPv6 Layout: Ask the Deco for a direct standard client IP address assignment
+    # Core IPv6 Layout
     /ipv6 dhcp-client add interface=ether1 request=address add-default-route=yes comment="WAN IPv6 Client Link"
     /interface list add name=Isolated-LANs comment="Contains all subnets behind the hEX"
 
@@ -82,10 +83,16 @@
         :if ($vlanId = "none") do={
             :set targetInterface "bridge-trunk"
             :set suffixTag "native"
+            
+            # Map untagged (PVID 1) traffic to the hardware table
+            /interface bridge vlan add bridge=bridge-trunk vlan-ids=1 untagged=bridge-trunk,ether2,ether3,ether4,ether5
         } else={
             :set targetInterface ("vlan-" . $vlanId)
             :set suffixTag ("vlan" . $vlanId)
             /interface vlan add interface=bridge-trunk name=$targetInterface vlan-id=$vlanId comment=$description
+            
+            # Map tagged trunk traffic to the hardware table
+            /interface bridge vlan add bridge=bridge-trunk vlan-ids=$vlanId tagged=bridge-trunk,ether2,ether3,ether4,ether5
         }
         
         :local poolName      ("pool-" . $suffixTag)
@@ -116,7 +123,6 @@
             :local advertiseFlag "no"
             :if ($runRa6 = "Y") do={ :set advertiseFlag "yes" }
             
-            # Applies the direct ULA address block to the interface
             /ipv6 address add address=$subId6 interface=$targetInterface advertise=$advertiseFlag comment=($description . " IPv6 Gateway")
             
             :if ($runRa6 = "Y") do={
@@ -129,20 +135,19 @@
     }
 
     # =========================================================================
-    # ENFORCE FILTER FIREWALL CONFIGURATIONS
+    # ENFORCE FILTER FIREWALL CONFIGURATIONS (With CPU Protection FastTrack)
     # =========================================================================
-    /ip firewall filter add chain=input src-address=192.168.1.0/24 action=accept comment="Isolate: Allow Home Access" place-before=*0
-    
     /ip firewall filter
+    add chain=input src-address=192.168.1.0/24 action=accept comment="Isolate: Allow Home Access" place-before=*0
+    
+    # FastTrack Engine: Routes established WAN and cross-network traffic away from the CPU 
+    add chain=forward action=fasttrack-connection connection-state=established,related comment="Isolate: FastTrack established traffic" place-before=*0
     add chain=forward connection-state=established,related action=accept comment="Isolate: Allow established/related packets" place-before=*0
+    
+    # Inter-VLAN Isolation Rule
     add chain=forward in-interface-list=Isolated-LANs out-interface-list=Isolated-LANs action=drop comment="Isolate: Block cross-VLAN traffic between subnets"
 
     /ipv6 firewall filter
     add chain=forward connection-state=established,related action=accept comment="Isolate: Allow established/related IPv6 packets" place-before=*0
     add chain=forward in-interface-list=Isolated-LANs out-interface-list=Isolated-LANs action=drop comment="Isolate: Block cross-VLAN traffic between IPv6 subnets"
 }
-
-# =========================================================================
-# STEP 2: DEPLOY AND EXECUTE
-# =========================================================================
-/system script run deploy_vlan_matrix
