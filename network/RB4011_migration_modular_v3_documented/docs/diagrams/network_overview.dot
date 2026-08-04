@@ -1,0 +1,194 @@
+digraph HomeNetwork {
+
+    graph [
+        rankdir=TB,
+        splines=ortho,
+        nodesep=0.5,
+        ranksep=0.8,
+        fontname="Helvetica"
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        fontname="Helvetica",
+        fontsize=10
+    ];
+
+    edge [
+        fontname="Helvetica",
+        fontsize=9
+    ];
+
+    //
+    // Internet
+    //
+
+    Internet [
+        label="Internet",
+        fillcolor="#d0e7ff"
+    ];
+
+    ONT [
+        label="EE FTTP ONT",
+        fillcolor="#d0e7ff"
+    ];
+
+    Internet -> ONT;
+
+    //
+    // RB4011
+    //
+
+    subgraph cluster_router {
+
+        label="MikroTik RB4011";
+        style=rounded;
+
+        CPU [
+            label="Router CPU\nPPPoE\nFirewall\nDHCP\nDNS\nNTP\nIPv6",
+            fillcolor="#ffe9b3"
+        ];
+
+        subgraph cluster_lab {
+
+            label="Switch Chip A";
+
+            style=filled;
+            color="#d6f5d6";
+
+            LabPorts [
+                label=<
+                <b>ether1</b><br/>
+                ether2<br/>
+                ether3<br/>
+                ether4<br/>
+                ether5
+                >,
+                fillcolor="#c9f2c9"
+            ];
+        }
+
+        subgraph cluster_home {
+
+            label="Switch Chip B";
+
+            style=filled;
+            color="#d6ecff";
+
+            HomePorts [
+                label=<
+                ether6<br/>
+                ether7<br/>
+                ether8<br/>
+                ether9<br/>
+                <b>ether10 (WAN)</b>
+                >,
+                fillcolor="#cfe8ff"
+            ];
+        }
+
+        CPU -> LabPorts;
+        CPU -> HomePorts;
+
+    }
+
+    //
+    // WAN
+    //
+
+    ONT -> CPU [
+        label="PPPoE\nether10"
+    ];
+
+    //
+    // HomeLAN
+    //
+
+    HomeBridge [
+        label="HomeLAN Bridge\n192.168.1.0/24\nGateway/DNS/NTP\n192.168.1.254",
+        fillcolor="#cfe8ff"
+    ];
+
+    Deco1 [
+        label="Deco X55 #1\nAP",
+        fillcolor="#e8f4ff"
+    ];
+
+    Deco2 [
+        label="Deco X55 #2\nAP",
+        fillcolor="#e8f4ff"
+    ];
+
+    Deco3 [
+        label="Deco X55 #3\nAP",
+        fillcolor="#e8f4ff"
+    ];
+
+    Clients [
+        label="Household Devices",
+        fillcolor="#ffffff"
+    ];
+
+    HomePorts -> HomeBridge;
+
+    HomeBridge -> Deco1;
+    HomeBridge -> Deco2;
+    HomeBridge -> Deco3;
+
+    Deco1 -> Clients;
+    Deco2 -> Clients;
+    Deco3 -> Clients;
+
+    //
+    // LabLAN
+    //
+
+    LabBridge [
+        label="LabLAN Bridge",
+        fillcolor="#c9f2c9"
+    ];
+
+    VLAN10 [
+        label="VLAN 10\n192.168.10.0/24"
+    ];
+
+    VLAN20 [
+        label="VLAN 20\n192.168.20.0/24"
+    ];
+
+    VLAN30 [
+        label="VLAN 30\n192.168.30.0/24"
+    ];
+
+    VLAN40 [
+        label="VLAN 40\nL2 only"
+    ];
+
+    VLAN88 [
+        label="VLAN 88\n192.168.88.0/24"
+    ];
+
+    LabPorts -> LabBridge;
+
+    LabBridge -> VLAN10;
+    LabBridge -> VLAN20;
+    LabBridge -> VLAN30;
+    LabBridge -> VLAN40;
+    LabBridge -> VLAN88;
+
+    //
+    // Routing
+    //
+
+    CPU -> HomeBridge [
+        style=dashed,
+        label="IPv4 / IPv6 Routing"
+    ];
+
+    CPU -> LabBridge [
+        style=dashed,
+        label="IPv4 / IPv6 Routing"
+    ];
+
+}
