@@ -2,7 +2,9 @@
 # ether10 is NOT a bridge member; it is the PPPoE WAN.
 
 /interface bridge
-add name=HomeLAN protocol-mode=rstp vlan-filtering=no comment="HomeLAN - ether6-9"
+# add name=HomeLAN protocol-mode=rstp vlan-filtering=no comment="HomeLAN - ether6-9"
+# Updated for Sonos dropouts
+add comment="HomeLAN - ether6-9" igmp-snooping=yes multicast-querier=yes name=HomeLAN priority=0x4000 protocol-mode=stp
 
 /interface bridge port
 add bridge=HomeLAN interface=ether6 comment="HomeLAN - Deco X55 #1"
