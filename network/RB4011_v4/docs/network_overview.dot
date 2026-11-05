@@ -1,0 +1,37 @@
+// RB4011 v4 network overview. Render: dot -Tsvg network_overview.dot -o network_overview.svg
+digraph rb4011 {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=11, nodesep=0.35, ranksep=0.9, labelloc=t,
+         label="RB4011 v4: HomeLAN unchanged; LabLAN split into management + one VLAN block per cloud\n "];
+  node  [shape=box, style="rounded", fontname="Helvetica", fontsize=10];
+  edge  [fontname="Helvetica", fontsize=9];
+
+  ee [label="EE FTTP\nPPPoE, DHCPv6-PD /56", shape=ellipse];
+
+  router [label="RB4011\nzones: WAN, HOME, MGMT,\nLAB_MZ640, LAB_MZ640TEST\nforward default-drop\nNAT (IPv4) + NAT66 (lab ULA)", style="rounded,bold"];
+
+  subgraph cluster_home {
+    label="HomeLAN  ether6-9  192.168.1.0/24, EE /64 + fd00:50::/64"; style=rounded;
+    decos [label="Deco X55 x3 (AP)\nSonos, Hue, clients"];
+    work  [label="Work MacBook\nisolated (by MAC)\nfrom all private ranges"];
+  }
+
+  subgraph cluster_lab {
+    label="LabLAN  ether1-5"; style=rounded;
+    mgmt [label="VLAN 88 management, IPv4 only  192.168.88.0/24\n.200-.219 mz640 APIs   .220-.239 mz640test APIs\n.252 mz640test   .253 mz640"];
+    v10  [label="VLAN 10  mz640 external (+ provider 11-19, L2)\n192.168.10.0/24, fd18:aaa8:47c3:10::/64\ntenants fd18:aaa8:47c3:1000::/52"];
+    v20  [label="VLAN 20  mz640test external (+ provider 21-29, L2)\n192.168.20.0/24, fd18:aaa8:47c3:20::/64\ntenants fd18:aaa8:47c3:2000::/52"];
+    mz640     [label="mz640 (HP Z640)\nether1 eno1 (access, 88)\nether2 ens4f0 (trunk 10-19), not cabled yet"];
+    mz640test [label="mz640test (HP Z640)\nether4 eno1 (access, 88)\nether5 ens4f0 (trunk 20-29)"];
+  }
+
+  ee -> router [dir=both, label="ether10"];
+  router -> decos [dir=both];
+  decos -> work [style=invis];
+  router -> mgmt;
+  router -> v10;
+  router -> v20;
+  mgmt -> mz640 [dir=none]; mgmt -> mz640test [dir=none];
+  v10 -> mz640 [dir=none, style=dashed, label="tagged"];
+  v20 -> mz640test [dir=none, label="tagged"];
+  mz640 -> mz640test [dir=none, penwidth=2, label="10GbE 192.168.200.0/24\n(direct, not via router)"];
+}
