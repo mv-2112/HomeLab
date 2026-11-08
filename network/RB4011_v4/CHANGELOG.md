@@ -1,5 +1,13 @@
 # Changelog
 
+## 8 Nov 2026: HomeLAN RSTP (Deco ethernet backhaul)
+
+- HomeLAN bridge: `protocol-mode=stp` -> `rstp`, ether6-9 `edge=yes`; root
+  priority (0x4000), IGMP snooping and the querier unchanged. Classic STP's
+  ~30 s listening/learning on every link-up made rebooted Decos choose
+  wireless backhaul after the v4 cutover. Live router:
+  `changes/2026-11-08-homelan-rstp.rsc` (applied by hand 8 Nov).
+
 ## 5 Nov 2026: Backstage DNS name
 
 - `backstage.mz640test.lab.home.arpa` -> 192.168.20.250, mz640test's fixed

@@ -11,6 +11,8 @@ Commands are in `src/general/90-verify.rsc`.
 - [ ] Decos up on ether6–8; clients on 192.168.1.0/24, gateway/DNS/NTP .254
 - [ ] Sonos speakers get their fixed addresses and can be found in the Sonos app
 - [ ] Hue bridge at .104
+- [ ] Decos on Ethernet backhaul (Deco app shows **Ethernet** for each satellite; give them 5-10 min after a reboot). HomeLAN is RSTP with ether6-9 `edge=yes` (`/interface bridge port monitor [find bridge=HomeLAN] once`: all forwarding)
+- [ ] Sonos plays in every room (ask the household)
 - [ ] IPv4 and IPv6 internet from a HomeLAN device
 - [ ] Work laptop: internet works, pinging a host (192.168.88.252) or any lab ULA fails
 
