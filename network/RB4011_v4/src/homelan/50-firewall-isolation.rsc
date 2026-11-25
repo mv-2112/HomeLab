@@ -25,3 +25,6 @@ add chain=forward action=drop src-mac-address=BC:D0:74:11:07:2D dst-address-list
     comment="CRITICAL: Drop work device IPv6 traffic to ULA (HomeLAN and lab)"
 add chain=input action=drop src-mac-address=BC:D0:74:11:07:2D disabled=yes \
     comment="CRITICAL: Prevent work device from probing MikroTik router ports (IPv6)"
+
+# This seems to remove some issues with mDNS/Sonos/Airplay
+/interface bridge set HomeLAN igmp-snooping=no multicast-querier=no
